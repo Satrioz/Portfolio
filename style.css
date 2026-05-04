@@ -300,6 +300,7 @@ body::before {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  visibility: hidden; /* hidden until init screen dismissed */
 }
 
 header {
@@ -804,6 +805,76 @@ main {
 }
 .detail-count span {
   color: var(--dark);
+}
+
+/* ── Project links (GitHub / Demo) ── */
+.proj-links {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.proj-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--dark);
+  background: none;
+  color: var(--dark);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-decoration: none;
+  cursor: none;
+  transition:
+    background 0.15s,
+    color 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+.proj-link-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--dark);
+  transform: translateX(-101%);
+  transition: transform 0.2s;
+  z-index: 0;
+}
+.proj-link-btn:hover {
+  color: var(--bg3);
+}
+.proj-link-btn:hover::before {
+  transform: translateX(0);
+}
+.proj-link-btn span {
+  position: relative;
+  z-index: 1;
+}
+.proj-link-btn:focus-visible {
+  outline: 2px solid var(--dark);
+  outline-offset: 2px;
+}
+
+/* ── Keyboard focus zone indicators ── */
+/* When a zone (nav, list, detail) is keyboard-focused, show subtle highlight */
+.focus-zone-active .item-row.kb-focus {
+  outline: 1px solid var(--dark2);
+  outline-offset: -1px;
+}
+.nav-item:focus-visible {
+  outline: 2px solid var(--bg3);
+  outline-offset: -2px;
+}
+/* Tab zone indicator — bottom bar updates to show current zone */
+.kb-zone-label {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--mid);
+  margin-left: 8px;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
 }
 
 /* ── Log detail ── */
@@ -1561,23 +1632,25 @@ main {
   position: fixed;
   inset: 0;
   background: var(--dark);
-  z-index: 10000; /* Paling atas */
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition:
-    opacity 0.6s ease,
-    visibility 0.6s;
+  cursor: default;
 }
 
 #init-screen.loaded {
-  opacity: 0;
-  visibility: hidden;
+  display: none;
+}
+
+#btn-init {
+  padding: 12px 30px;
+  font-size: 13px;
+  cursor: pointer;
 }
 
 .init-box {
   text-align: center;
-  animation: fadeIn 1s ease;
 }
 
 .init-title {
@@ -1594,11 +1667,6 @@ main {
   letter-spacing: 3px;
   color: var(--mid);
   margin-bottom: 30px;
-}
-
-#btn-init {
-  padding: 12px 30px;
-  font-size: 13px;
 }
 
 /* ── Initialization Prompt ── */
@@ -1662,4 +1730,73 @@ main {
 #cur.visible,
 #cur-dot.visible {
   opacity: 1;
+}
+
+/* ════════════════════════════════════════════
+   KEYBOARD ZONE INDICATORS
+   Visual feedback saat user navigasi dengan keyboard
+════════════════════════════════════════════ */
+
+/* Nav item glow saat zone = nav */
+.nav-item.kb-nav-active {
+  box-shadow: inset 0 -2px 0 var(--bg3);
+  color: var(--bg3) !important;
+}
+
+/* Col-left highlight saat zone = list */
+.col-left.kb-list-active {
+  outline: 1px solid var(--dark2);
+  outline-offset: -1px;
+  position: relative;
+}
+.col-left.kb-list-active::after {
+  content: "FOCUS";
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--dark);
+  background: var(--border);
+  padding: 2px 6px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Zone label badge in bottom bar */
+.kb-zone-label {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--dark);
+  background: var(--border);
+  padding: 2px 7px;
+  min-width: 36px;
+  text-align: center;
+  transition: opacity 0.2s;
+}
+.kb-zone-label:empty {
+  display: none;
+}
+
+/* keyboard-focused item row */
+.item-row.kb-focus {
+  outline: 1px solid var(--dark2);
+  outline-offset: -2px;
+}
+
+/* ════════════════════════════════════════════
+   NAV TERMINAL BUTTON — ensure consistent style
+════════════════════════════════════════════ */
+.nav-terminal-btn {
+  color: #c8a535 !important;
+  letter-spacing: 2px;
+}
+.nav-terminal-btn:hover {
+  color: #e6c060 !important;
+  background: rgba(200, 165, 53, 0.08) !important;
+}
+/* Icon inside terminal button */
+.nav-terminal-btn .nav-icon {
+  stroke: #c8a535;
+  opacity: 1 !important;
 }

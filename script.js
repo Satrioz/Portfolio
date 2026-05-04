@@ -1,189 +1,165 @@
 /* ════════════════════════════════════════════
    NIER:AUTOMATA PORTFOLIO — script.js
-   v4 — notif/confirm sounds + Terminal + secure admin
+   Data bersumber dari data.js (PROJECTS & FIELD_LOG).
+   Terminal hanya showcase — tidak ada CRUD.
 ════════════════════════════════════════════ */
 
-document.addEventListener("DOMContentLoaded", () => {
-  initAudio();
-  initCursor();
-  initNav();
-  initGlitch();
-  initSkillBars();
-  initProjectList();
-  initLogList();
-  initClock();
-  initAlert();
-  initTerminal();
-  initEasterEgg();
-
-  const initScreen = document.getElementById("init-screen");
-  if (initScreen) {
-    const startSystem = () => {
-      if (initScreen.classList.contains("loaded")) return;
-      playSound("opening", 0.6);
-      initScreen.classList.add("loaded");
-      triggerGlitch();
-      window.removeEventListener("click", startSystem);
-      window.removeEventListener("keydown", startSystem);
-    };
-    window.addEventListener("click", startSystem);
-    window.addEventListener("keydown", startSystem);
-  }
-});
-
 /* ════════════════════════════════════════════
-   AUDIO ENGINE
+   AUDIO
 ════════════════════════════════════════════ */
 const SFX = {};
 
 function initAudio() {
-  const files = {
-    opening: "opening.mp3",
-    navigasi: "navigasi.mp3",
-    select: "select.mp3",
-    transmit: "transmit.mp3",
-    notif: "notif.mp3", // easter egg / alert open
-    confirm: "confirm.mp3", // confirm button
-  };
-  Object.entries(files).forEach(([key, src]) => {
-    const a = new Audio(src);
-    a.preload = "auto";
-    SFX[key] = a;
-  });
+  ["opening", "navigasi", "select", "transmit", "notif", "confirm"].forEach(
+    (key) => {
+      const a = new Audio(`${key}.mp3`);
+      a.preload = "auto";
+      SFX[key] = a;
+    },
+  );
 }
 
-function playSound(key, volume = 0.7) {
+function playSound(key, vol = 0.7) {
   const src = SFX[key];
   if (!src) return;
   const clone = src.cloneNode();
-  clone.volume = Math.min(1, Math.max(0, volume));
+  clone.volume = Math.min(1, Math.max(0, vol));
   clone.play().catch(() => {});
 }
 
 /* ════════════════════════════════════════════
-   CUSTOM CURSOR
+   CURSOR
 ════════════════════════════════════════════ */
 function initCursor() {
   const cur = document.getElementById("cur");
   const dot = document.getElementById("cur-dot");
-  if (!cur || !dot) return;
-  if (!window.matchMedia("(hover: none)").matches) {
-    let mx = window.innerWidth / 2,
-      my = window.innerHeight / 2,
-      cx = mx,
-      cy = my;
-    let isVisible = false;
-    const toggleCursor = (show) => {
-      isVisible = show;
-      cur.classList.toggle("visible", show);
-      dot.classList.toggle("visible", show);
-    };
-    document.addEventListener("mousemove", (e) => {
-      if (!isVisible) toggleCursor(true);
-      mx = e.clientX;
-      my = e.clientY;
-      dot.style.left = mx + "px";
-      dot.style.top = my + "px";
+  if (!cur || !dot || window.matchMedia("(hover: none)").matches) return;
+
+  let mx = innerWidth / 2,
+    my = innerHeight / 2;
+  let cx = mx,
+    cy = my,
+    visible = false;
+
+  const setVisible = (v) => {
+    visible = v;
+    cur.classList.toggle("visible", v);
+    dot.classList.toggle("visible", v);
+  };
+
+  document.addEventListener("mousemove", (e) => {
+    if (!visible) setVisible(true);
+    mx = e.clientX;
+    my = e.clientY;
+    dot.style.left = `${mx}px`;
+    dot.style.top = `${my}px`;
+  });
+  document.addEventListener("mouseleave", () => setVisible(false));
+  document.addEventListener("mouseenter", (e) => {
+    setVisible(true);
+    mx = e.clientX;
+    my = e.clientY;
+    cx = mx;
+    cy = my;
+  });
+
+  (function loop() {
+    cx += (mx - cx) * 0.14;
+    cy += (my - cy) * 0.14;
+    cur.style.left = `${cx}px`;
+    cur.style.top = `${cy}px`;
+    requestAnimationFrame(loop);
+  })();
+
+  document
+    .querySelectorAll(
+      "a, button, .nav-item:not(.locked), .item-row:not(.locked-row), .btn-transmit, .al-btn, .term-close, .nav-terminal-btn, .proj-link-btn",
+    )
+    .forEach((el) => {
+      el.addEventListener("mouseenter", () => cur.classList.add("big"));
+      el.addEventListener("mouseleave", () => cur.classList.remove("big"));
     });
-    document.addEventListener("mouseleave", () => toggleCursor(false));
-    document.addEventListener("mouseenter", (e) => {
-      toggleCursor(true);
-      mx = e.clientX;
-      my = e.clientY;
-      cx = mx;
-      cy = my;
-    });
-    (function loop() {
-      cx += (mx - cx) * 0.14;
-      cy += (my - cy) * 0.14;
-      cur.style.left = cx + "px";
-      cur.style.top = cy + "px";
-      requestAnimationFrame(loop);
-    })();
-    document
-      .querySelectorAll(
-        "a, button, .nav-item:not(.locked), .item-row:not(.locked-row), .btn-transmit, .al-btn, .term-close, #nav-terminal-btn, #nav-terminal-btn-desktop",
-      )
-      .forEach((el) => {
-        el.addEventListener("mouseenter", () => cur.classList.add("big"));
-        el.addEventListener("mouseleave", () => cur.classList.remove("big"));
-      });
-  }
 }
 
 /* ════════════════════════════════════════════
    NAVIGATION
 ════════════════════════════════════════════ */
+const NAV_LABELS = {
+  profile: { main: "PROFILE", sub: "- Unit Data" },
+  projects: { main: "PROJECTS", sub: "- Mission Archive" },
+  experience: { main: "FIELD LOG", sub: "- Operation History" },
+  transmit: { main: "TRANSMIT", sub: "- Open Channel" },
+};
+
+let currentTab = "profile";
+
+function switchTab(id) {
+  if (!NAV_LABELS[id]) return;
+  currentTab = id;
+
+  document
+    .querySelectorAll(".nav-item[data-target]")
+    .forEach((n) => n.classList.toggle("active", n.dataset.target === id));
+  document
+    .querySelectorAll(".page-section")
+    .forEach((s) => s.classList.toggle("active", s.id === id));
+
+  const label = NAV_LABELS[id];
+  const lEl = document.getElementById("section-label");
+  const sEl = document.getElementById("section-label-sub");
+  if (lEl) lEl.textContent = label.main;
+  if (sEl) sEl.textContent = label.sub;
+
+  triggerGlitch();
+  if (id === "profile") animateSkillBars();
+  if (id === "transmit") animateTechBars();
+
+  document
+    .querySelector(".nav-mobile .nav-item.active")
+    ?.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+}
+
 function initNav() {
-  const navItems = document.querySelectorAll(".nav-item[data-target]");
-  const sections = document.querySelectorAll(".page-section");
-  const labels = {
-    profile: { main: "PROFILE", sub: "- Unit Data" },
-    projects: { main: "PROJECTS", sub: "- Mission Archive" },
-    experience: { main: "FIELD LOG", sub: "- Operation History" },
-    transmit: { main: "TRANSMIT", sub: "- Open Channel" },
-  };
-
-  function switchTab(targetId) {
-    navItems.forEach((n) =>
-      n.classList.toggle("active", n.dataset.target === targetId),
-    );
-    sections.forEach((s) => s.classList.toggle("active", s.id === targetId));
-    const lbl = labels[targetId];
-    const lEl = document.getElementById("section-label");
-    const sEl = document.getElementById("section-label-sub");
-    if (lEl && lbl) lEl.textContent = lbl.main;
-    if (sEl && lbl) sEl.textContent = lbl.sub;
-    triggerGlitch();
-    if (targetId === "profile") animateSkillBars();
-    if (targetId === "transmit") animateTechBars();
-    const activeNav = document.querySelector(".nav-mobile .nav-item.active");
-    if (activeNav)
-      activeNav.scrollIntoView({
-        behavior: "smooth",
-        inline: "center",
-        block: "nearest",
-      });
-  }
-
-  navItems.forEach((item) => {
+  document.querySelectorAll(".nav-item[data-target]").forEach((item) => {
     item.addEventListener("click", () => {
       if (item.classList.contains("locked")) return;
       playSound("navigasi", 0.65);
       switchTab(item.dataset.target);
     });
   });
-
-  document.addEventListener("keydown", (e) => {
-    // Don't fire nav keys when terminal is focused
-    if (document.getElementById("term-modal")?.classList.contains("open"))
-      return;
-    const all = [
-      ...document.querySelectorAll(
-        ".nav-desktop .nav-item[data-target]:not(.locked)",
-      ),
-    ];
-    const active = document.querySelector(".nav-desktop .nav-item.active");
-    const idx = all.indexOf(active);
-    if (e.key === "ArrowRight" && idx < all.length - 1) {
-      playSound("navigasi", 0.65);
-      switchTab(all[idx + 1].dataset.target);
-    }
-    if (e.key === "ArrowLeft" && idx > 0) {
-      playSound("navigasi", 0.65);
-      switchTab(all[idx - 1].dataset.target);
-    }
-  });
 }
 
 /* ════════════════════════════════════════════
    GLITCH
 ════════════════════════════════════════════ */
+function triggerGlitch() {
+  const overlay = document.getElementById("glitch-o");
+  if (!overlay) return;
+
+  overlay.style.opacity = "1";
+  for (let i = 0; i < 4; i++) {
+    const line = document.createElement("div");
+    line.className = "gl-line";
+    line.style.top = `${Math.random() * 100}%`;
+    line.style.height = `${Math.random() * 3 + 1}px`;
+    overlay.appendChild(line);
+    setTimeout(() => line.remove(), 180);
+  }
+  setTimeout(() => {
+    overlay.style.opacity = "0";
+  }, 140);
+}
+
 function initGlitch() {
-  function schedule() {
+  (function schedule() {
     setTimeout(
       () => {
         triggerGlitch();
+
         if (Math.random() > 0.6) {
           const st = document.getElementById("sys-status");
           const bh = document.getElementById("bottom-hint");
@@ -192,6 +168,7 @@ function initGlitch() {
             st.style.color = "#8b1a1a";
           }
           if (bh) bh.textContent = "SYSTEM ANOMALY DETECTED...";
+
           setTimeout(() => {
             if (st) {
               st.textContent = "ONLINE";
@@ -200,250 +177,185 @@ function initGlitch() {
             if (bh) bh.textContent = "アイテムを選択してください。";
           }, 380);
         }
+
         schedule();
       },
       7000 + Math.random() * 11000,
     );
-  }
-  schedule();
-}
-
-function triggerGlitch() {
-  const o = document.getElementById("glitch-o");
-  if (!o) return;
-  o.style.opacity = "1";
-  for (let i = 0; i < 4; i++) {
-    const l = document.createElement("div");
-    l.className = "gl-line";
-    l.style.top = Math.random() * 100 + "%";
-    l.style.height = Math.random() * 3 + 1 + "px";
-    o.appendChild(l);
-    setTimeout(() => l.remove(), 180);
-  }
-  setTimeout(() => {
-    o.style.opacity = "0";
-  }, 140);
+  })();
 }
 
 /* ════════════════════════════════════════════
-   SKILL BARS
+   SKILL / TECH BARS
 ════════════════════════════════════════════ */
 function initSkillBars() {
   setTimeout(animateSkillBars, 300);
 }
+
 function animateSkillBars() {
-  document.querySelectorAll("#profile .skill-fill").forEach((bar, i) => {
+  document.querySelectorAll("#profile .skill-fill").forEach((bar, i) =>
     setTimeout(() => {
       bar.style.width = bar.dataset.w || "0%";
-    }, i * 140);
-  });
+    }, i * 140),
+  );
 }
+
 function animateTechBars() {
-  document.querySelectorAll(".tech-fill").forEach((bar, i) => {
+  document.querySelectorAll(".tech-fill").forEach((bar, i) =>
     setTimeout(() => {
       bar.style.width = bar.dataset.w || "0%";
-    }, i * 100);
-  });
+    }, i * 100),
+  );
 }
 
 /* ════════════════════════════════════════════
-   PROJECT DATA (source of truth — shared with terminal)
+   PROJECTS — rendered from PROJECTS in data.js
 ════════════════════════════════════════════ */
-let projectData = {
-  "proj-1": {
-    title: "DATA VISUALIZATION DASHBOARD",
-    desc: "Interactive analytics dashboard for large-scale data exploration. Real-time WebSocket feeds for live operational data monitoring. Handles 1M+ data points with smooth 60fps rendering.",
-    tags: ["PYTHON", "D3.JS", "WEBSOCKET", "PANDAS", "FLASK"],
-    lv: 85,
-    status: "COMPLETE",
-    count: "3 / 99",
-  },
-  "proj-2": {
-    title: "E-COMMERCE PLATFORM",
-    desc: "Full-stack commerce system with real-time inventory management, Stripe payment gateway, and ML-powered product recommendations. Handles 10k+ concurrent users.",
-    tags: ["REACT", "NODE.JS", "POSTGRESQL", "STRIPE", "REDIS"],
-    lv: 90,
-    status: "IN PROGRESS",
-    count: "1 / 99",
-  },
-  "proj-3": {
-    title: "AI CHATBOT SYSTEM",
-    desc: "Adaptive chatbot powered by transformer models with context-aware dialogue management. Fine-tuned on domain-specific corpora. 94.2% intent classification accuracy.",
-    tags: ["PYTHON", "TRANSFORMERS", "FASTAPI", "PYTORCH", "DOCKER"],
-    lv: 78,
-    status: "COMPLETE",
-    count: "7 / 99",
-  },
-  "proj-4": {
-    title: "PREDICTIVE ANALYTICS ENGINE",
-    desc: "Time-series forecasting system for business intelligence. Ensemble model combining LSTM and XGBoost. Deployed as a microservice handling 500+ forecast requests per minute.",
-    tags: ["SCIKIT-LEARN", "LSTM", "XGBOOST", "STREAMLIT", "AWS"],
-    lv: 72,
-    status: "ARCHIVED",
-    count: "2 / 99",
-  },
-  "proj-5": {
-    title: "REAL-TIME MONITORING SYSTEM",
-    desc: "Infrastructure monitoring with ML anomaly detection and predictive maintenance. Processes 10k+ events per second at sub-100ms latency across distributed nodes.",
-    tags: ["KAFKA", "ELASTICSEARCH", "NEXT.JS", "DOCKER", "GRAFANA"],
-    lv: 95,
-    status: "COMPLETE",
-    count: "5 / 99",
-  },
-};
+function renderProjectLinks(proj) {
+  const container = document.getElementById("proj-detail-links");
+  if (!container) return;
 
-function refreshProjectList() {
-  // Re-render left col project list from projectData
-  const list = document.querySelector("#projects .item-list");
-  if (!list) return;
-  list.innerHTML =
-    Object.entries(projectData)
-      .map(
-        ([key, d]) => `
-    <div class="item-row" data-proj="${key}">
-      <span class="item-arrow">◆</span>
-      <span class="item-icon">⚙</span>
-      <span class="item-name">${d.title.slice(0, 22).toUpperCase()}</span>
-      <span class="item-badge">Lv:${d.lv}</span>
-    </div>
-  `,
-      )
-      .join("") +
-    `
-    <div class="item-row locked-row">
-      <span class="item-arrow">◆</span>
-      <span class="item-icon">⚙</span>
-      <span class="item-name">CLASSIFIED</span>
-      <span class="item-badge">???</span>
-    </div>`;
-  // Re-attach listeners
-  const rows = list.querySelectorAll(".item-row[data-proj]");
-  rows.forEach((row) => {
-    row.addEventListener("click", () => {
-      if (row.classList.contains("selected")) return;
-      playSound("select", 0.7);
-      rows.forEach((r) => {
-        r.classList.remove("selected", "animating");
-      });
-      row.classList.add("selected", "animating");
-      showProjectDetail(row.dataset.proj);
-    });
-  });
-  // Select first
-  if (rows[0]) {
-    rows[0].classList.add("selected");
-    showProjectDetail(rows[0].dataset.proj);
-  }
+  const links = [];
+  if (proj.github)
+    links.push(
+      `<a class="proj-link-btn" href="${proj.github}" target="_blank" rel="noopener"><span>&lt;/&gt; GITHUB</span></a>`,
+    );
+  if (proj.demo)
+    links.push(
+      `<a class="proj-link-btn" href="${proj.demo}"   target="_blank" rel="noopener"><span>&#9654; LIVE DEMO</span></a>`,
+    );
+  container.innerHTML = links.join("");
 }
 
-function initProjectList() {
-  const rows = document.querySelectorAll(".item-row[data-proj]");
-  rows.forEach((row) => {
-    row.addEventListener("click", () => {
-      if (row.classList.contains("selected")) return;
-      playSound("select", 0.7);
-      rows.forEach((r) => {
-        r.classList.remove("selected", "animating");
-      });
-      row.classList.add("selected", "animating");
-      showProjectDetail(row.dataset.proj);
-    });
-  });
-  if (rows[0]) {
-    rows[0].classList.add("selected");
-    showProjectDetail(rows[0].dataset.proj);
-  }
-}
+function showProjectDetail(index) {
+  const proj = PROJECTS[index];
+  if (!proj) return;
 
-function showProjectDetail(key) {
-  const d = projectData[key];
-  if (!d) return;
-  const set = (id, val) => {
+  const set = (id, v) => {
     const el = document.getElementById(id);
-    if (el) el.textContent = val;
+    if (el) el.textContent = v;
   };
-  const setHtml = (id, val) => {
+  const setHtml = (id, v) => {
     const el = document.getElementById(id);
-    if (el) el.innerHTML = val;
+    if (el) el.innerHTML = v;
   };
-  set("proj-detail-title", d.title);
-  set("proj-detail-desc", d.desc);
-  set("proj-stat-lv", d.lv);
-  setHtml("proj-detail-count", `所持数：<span>${d.count}</span>`);
+
+  set("proj-detail-title", proj.title);
+  set("proj-detail-desc", proj.desc);
+  set("proj-stat-lv", proj.lv);
   setHtml(
     "proj-detail-tags",
-    d.tags.map((t) => `<span class="ptag">${t}</span>`).join(""),
+    proj.tags.map((t) => `<span class="ptag">${t}</span>`).join(""),
   );
-  const stEl = document.getElementById("proj-stat-status");
-  if (stEl) {
-    stEl.textContent = d.status;
-    stEl.className = "status-val";
-    if (d.status === "COMPLETE") stEl.style.color = "var(--status-ok)";
-    else if (d.status === "IN PROGRESS") stEl.style.color = "#8b7a20";
-    else stEl.style.color = "var(--mid)";
+  renderProjectLinks(proj);
+
+  const statusEl = document.getElementById("proj-stat-status");
+  if (statusEl) {
+    statusEl.textContent = proj.status;
+    statusEl.style.color =
+      proj.status === "COMPLETE"
+        ? "var(--status-ok)"
+        : proj.status === "IN PROGRESS"
+          ? "#8b7a20"
+          : "var(--mid)";
   }
+}
+
+function buildProjectList() {
+  const list = document.querySelector("#projects .item-list");
+  if (!list) return;
+
+  list.innerHTML =
+    PROJECTS.map((proj, i) => {
+      const name =
+        proj.title.length > 22 ? proj.title.slice(0, 22) + "…" : proj.title;
+      return `<div class="item-row" data-index="${i}" tabindex="-1">
+      <span class="item-arrow">&#9670;</span>
+      <span class="item-icon">&#9881;</span>
+      <span class="item-name">${name}</span>
+      <span class="item-badge">Lv:${proj.lv}</span>
+    </div>`;
+    }).join("") +
+    `<div class="item-row locked-row">
+    <span class="item-arrow">&#9670;</span>
+    <span class="item-icon">&#9881;</span>
+    <span class="item-name">CLASSIFIED</span>
+    <span class="item-badge">???</span>
+  </div>`;
+
+  const badge = document.querySelector("#projects .panel-header .ph-sub");
+  if (badge) badge.textContent = `${PROJECTS.length} / ${PROJECTS.length + 1}`;
+
+  list.querySelectorAll(".item-row[data-index]").forEach((row) => {
+    row.addEventListener("click", () => selectProjectRow(row));
+  });
+
+  const first = list.querySelector(".item-row[data-index]");
+  if (first) {
+    first.classList.add("selected");
+    showProjectDetail(0);
+  }
+}
+
+function selectProjectRow(row) {
+  playSound("select", 0.7);
+  document
+    .querySelectorAll(".item-row[data-index]")
+    .forEach((r) => r.classList.remove("selected", "animating"));
+  row.classList.add("selected", "animating");
+  showProjectDetail(Number(row.dataset.index));
 }
 
 /* ════════════════════════════════════════════
-   FIELD LOG LIST
+   FIELD LOG — rendered from FIELD_LOG in data.js
 ════════════════════════════════════════════ */
-const logData = {
-  "log-1": {
-    date: "2023 — PRESENT",
-    title: "SENIOR DATA ENGINEER",
-    org: "// TECH CORP INDONESIA",
-    desc: "Architected data pipeline infrastructure handling 50M+ daily transactions. Led a team of 6 engineers. Reduced processing latency by 67% through distributed computing optimizations and intelligent caching layers.",
-  },
-  "log-2": {
-    date: "2021 — 2023",
-    title: "FULL-STACK DEVELOPER",
-    org: "// STARTUP VENTURES",
-    desc: "Built and shipped 3 production web applications from zero to launch. Implemented CI/CD pipelines and automated testing suites. Scaled user base from 0 to 50k+ monthly active users.",
-  },
-  "log-3": {
-    date: "2020 — 2021",
-    title: "DATA ANALYST",
-    org: "// ANALYTICS FIRM",
-    desc: "Developed reporting dashboards and statistical models for Fortune 500 clients. Delivered weekly executive briefings translating complex datasets into actionable strategic recommendations.",
-  },
-  "log-4": {
-    date: "2016 — 2020",
-    title: "S1 COMPUTER SCIENCE",
-    org: "// UNIVERSITAS INDONESIA",
-    desc: "Graduated with honors. Thesis on neural network optimization for NLP tasks. Active in competitive programming — national ACM-ICPC regionals placement. GPA: 3.87 / 4.00.",
-  },
-};
+function showLogDetail(index) {
+  const log = FIELD_LOG[index];
+  if (!log) return;
 
-function initLogList() {
-  const items = document.querySelectorAll(".item-row[data-log]");
-  items.forEach((item) => {
-    item.addEventListener("click", () => {
-      if (item.classList.contains("selected")) return;
-      playSound("select", 0.7);
-      items.forEach((i) => {
-        i.classList.remove("selected", "animating");
-      });
-      item.classList.add("selected", "animating");
-      showLogDetail(item.dataset.log);
-    });
+  const set = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = v;
+  };
+  set("log-detail-date", log.date);
+  set("log-detail-title", log.title);
+  set("log-detail-org", log.org);
+  set("log-detail-desc", log.desc);
+}
+
+function buildLogList() {
+  const list = document.querySelector("#experience .item-list");
+  if (!list) return;
+
+  list.innerHTML = FIELD_LOG.map(
+    (log, i) => `
+    <div class="item-row log-row" data-log-index="${i}" tabindex="-1">
+      <span class="item-arrow">&#9670;</span>
+      <div>
+        <div class="log-date-sm">${log.date}</div>
+        <div class="item-name">${log.title}</div>
+      </div>
+    </div>`,
+  ).join("");
+
+  list.querySelectorAll(".item-row[data-log-index]").forEach((row) => {
+    row.addEventListener("click", () => selectLogRow(row));
   });
-  if (items[0]) {
-    items[0].classList.add("selected");
-    showLogDetail(items[0].dataset.log);
+
+  const first = list.querySelector(".item-row[data-log-index]");
+  if (first) {
+    first.classList.add("selected");
+    showLogDetail(0);
   }
 }
 
-function showLogDetail(key) {
-  const d = logData[key];
-  if (!d) return;
-  const set = (id, val) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = val;
-  };
-  set("log-detail-date", d.date);
-  set("log-detail-title", d.title);
-  set("log-detail-org", d.org);
-  set("log-detail-desc", d.desc);
+function selectLogRow(row) {
+  playSound("select", 0.7);
+  document
+    .querySelectorAll(".item-row[data-log-index]")
+    .forEach((r) => r.classList.remove("selected", "animating"));
+  row.classList.add("selected", "animating");
+  showLogDetail(Number(row.dataset.logIndex));
 }
 
 /* ════════════════════════════════════════════
@@ -459,8 +371,24 @@ function initClock() {
 }
 
 /* ════════════════════════════════════════════
-   ALERT — with proper sound triggers
+   ALERT
 ════════════════════════════════════════════ */
+function openAlert(msg, sub, isNotif = false) {
+  const msgEl = document.getElementById("al-msg");
+  const subEl = document.getElementById("al-sub");
+  if (msgEl) msgEl.textContent = msg;
+  if (subEl) subEl.innerHTML = sub;
+  document.getElementById("al")?.classList.add("open");
+  document.getElementById("al-ov")?.classList.add("open");
+  if (isNotif) playSound("notif", 0.7);
+}
+
+function closeAlert() {
+  document.getElementById("al")?.classList.remove("open");
+  document.getElementById("al-ov")?.classList.remove("open");
+}
+window.closeAlert = closeAlert;
+
 function initAlert() {
   document.getElementById("btn-transmit")?.addEventListener("click", (e) => {
     e.preventDefault();
@@ -474,61 +402,148 @@ function initAlert() {
     playSound("select", 0.5);
     closeAlert();
   });
-
-  // CONFIRM button → confirm.mp3
   document.getElementById("al-btn-confirm")?.addEventListener("click", () => {
     playSound("confirm", 0.75);
     closeAlert();
   });
-  // DISMISS button → select.mp3
   document.getElementById("al-btn-dismiss")?.addEventListener("click", () => {
     playSound("select", 0.5);
     closeAlert();
   });
 }
 
-function openAlert(msg, sub, isNotif = false) {
-  const msgEl = document.getElementById("al-msg");
-  const subEl = document.getElementById("al-sub");
-  if (msgEl) msgEl.textContent = msg;
-  if (subEl) subEl.innerHTML = sub;
-  document.getElementById("al")?.classList.add("open");
-  document.getElementById("al-ov")?.classList.add("open");
-  // notif.mp3 for easter egg / system notifications, transmit handles its own sound
-  if (isNotif) playSound("notif", 0.7);
+/* ════════════════════════════════════════════
+   KEYBOARD NAVIGATION
+   Tab  → toggle zone: nav ↔ list
+   ← →  → switch tabs (zone: nav)
+   ↑ ↓  → move items (zone: list)
+════════════════════════════════════════════ */
+let kbZone = "nav";
+let kbListIndex = 0;
+
+const ZONE_HINTS = {
+  nav: "← → switch tab  ·  TAB focus list",
+  list: "↑ ↓ select item  ·  TAB back to nav",
+};
+
+function setKbZone(zone) {
+  kbZone = zone;
+
+  const hint = document.getElementById("bottom-hint");
+  if (hint)
+    hint.textContent = ZONE_HINTS[zone] || "アイテムを選択してください。";
+
+  const badge = document.getElementById("kb-zone-label");
+  if (badge) badge.textContent = zone === "nav" ? "" : zone.toUpperCase();
+
+  document
+    .querySelectorAll(".nav-item[data-target]")
+    .forEach((n) =>
+      n.classList.toggle(
+        "kb-nav-active",
+        zone === "nav" && n.classList.contains("active"),
+      ),
+    );
+
+  document
+    .querySelectorAll(".col-left")
+    .forEach((c) => c.classList.toggle("kb-list-active", zone === "list"));
 }
 
-function closeAlert() {
-  document.getElementById("al")?.classList.remove("open");
-  document.getElementById("al-ov")?.classList.remove("open");
+function getActiveRows() {
+  if (currentTab === "projects")
+    return [...document.querySelectorAll("#projects .item-row[data-index]")];
+  if (currentTab === "experience")
+    return [
+      ...document.querySelectorAll("#experience .item-row[data-log-index]"),
+    ];
+  return [];
 }
-window.closeAlert = closeAlert;
+
+function kbSelectRow(idx) {
+  const rows = getActiveRows();
+  if (!rows.length) return;
+  kbListIndex = Math.max(0, Math.min(rows.length - 1, idx));
+  const row = rows[kbListIndex];
+  if (!row) return;
+  if (currentTab === "projects") selectProjectRow(row);
+  if (currentTab === "experience") selectLogRow(row);
+  row.scrollIntoView({ block: "nearest" });
+}
+
+function initKeyboardNav() {
+  setKbZone("nav");
+
+  document.addEventListener("keydown", (e) => {
+    if (document.getElementById("term-modal")?.classList.contains("open"))
+      return;
+    if (document.activeElement?.id === "term-input") return;
+    if (document.getElementById("al")?.classList.contains("open")) return;
+
+    const { key } = e;
+
+    if (key === "Tab") {
+      e.preventDefault();
+      const hasRows = getActiveRows().length > 0;
+      if (kbZone === "nav" && hasRows) {
+        setKbZone("list");
+        const rows = getActiveRows();
+        const si = rows.findIndex((r) => r.classList.contains("selected"));
+        kbListIndex = si >= 0 ? si : 0;
+      } else {
+        setKbZone("nav");
+        document.querySelector(".nav-desktop .nav-item.active")?.focus();
+      }
+      return;
+    }
+
+    if (kbZone === "nav") {
+      const navItems = [
+        ...document.querySelectorAll(
+          ".nav-desktop .nav-item[data-target]:not(.locked)",
+        ),
+      ];
+      const idx = navItems.indexOf(
+        document.querySelector(".nav-desktop .nav-item.active"),
+      );
+      if (key === "ArrowRight" && idx < navItems.length - 1) {
+        playSound("navigasi", 0.65);
+        switchTab(navItems[idx + 1].dataset.target);
+      }
+      if (key === "ArrowLeft" && idx > 0) {
+        playSound("navigasi", 0.65);
+        switchTab(navItems[idx - 1].dataset.target);
+      }
+    }
+
+    if (kbZone === "list") {
+      if (key === "ArrowDown") {
+        e.preventDefault();
+        kbSelectRow(kbListIndex + 1);
+      }
+      if (key === "ArrowUp") {
+        e.preventDefault();
+        kbSelectRow(kbListIndex - 1);
+      }
+    }
+  });
+}
 
 /* ════════════════════════════════════════════
-   TERMINAL
-   Security model:
-   - Credentials NEVER stored in localStorage/sessionStorage/cookie
-   - Auth token is a JS-only in-memory flag, cleared on close/reload
-   - Password input masked in UI (shows ● characters)
-   - Username/password matched against hashed values via SubtleCrypto
-   - Plain credentials never appear in JS source — only SHA-256 hashes
+   TERMINAL — showcase only
+   cls   = close terminal window
+   clear = clear terminal output
 ════════════════════════════════════════════ */
-
-// ── CHANGE THESE HASHES to set your own credentials ──
-// Generate: https://emn178.github.io/online-tools/sha256.html
-// Default: username="operator" password="YoRHa2B9S!"
-// REPLACE with your own hashes before deploying!
 const CRED_HASH = {
   user: "94065e16c7735a2f29115469daf78177b42e1518d335dcd4593153845b472950", // sha256("satrio")
   pass: "409a14887e0958f1efcd8de91a587561397bfcc5d994b9d6cfc2d758c8b49296", // sha256("glory")
 };
 
-let termAuth = false; // in-memory only — cleared on every page load/refresh
-let termInputMode = null; // null | "username" | "password" | "proj-add" | "proj-edit" | "proj-delete"
-let termInputStep = 0;
+let termAuth = false;
+let termMode = null; // null | "username" | "password"
 let termTempUser = "";
-let termProjDraft = {};
-let termEditKey = "";
+let termHistory = [];
+let termHistoryIdx = -1;
 
 async function sha256(str) {
   const buf = await crypto.subtle.digest(
@@ -551,36 +566,31 @@ function closeTerminal() {
   playSound("select", 0.5);
   document.getElementById("term-modal")?.classList.remove("open");
   document.getElementById("term-ov")?.classList.remove("open");
-  // Security: clear auth on close so re-open requires login again
+  // Security: always clear auth on close
   termAuth = false;
-  termInputMode = null;
+  termMode = null;
   termTempUser = "";
-  termProjDraft = {};
-  const promptEl = document.getElementById("term-prompt");
-  if (promptEl) promptEl.textContent = "guest@yorha:~$";
+  termHistoryIdx = -1;
+  const pr = document.getElementById("term-prompt");
+  if (pr) pr.textContent = "guest@yorha:~$";
 }
 
-function termPrint(text, cls = "term-sys") {
+function termPrint(html, cls = "term-sys") {
   const body = document.getElementById("term-body");
   if (!body) return;
   const line = document.createElement("div");
   line.className = `term-line ${cls}`;
-  line.innerHTML = text;
+  line.innerHTML = html;
   body.appendChild(line);
   body.scrollTop = body.scrollHeight;
 }
-
-function termBlank() {
-  termPrint("&nbsp;");
-}
-
-function termClear() {
-  const body = document.getElementById("term-body");
-  if (body) body.innerHTML = "";
-}
+const termBlank = () => termPrint("&nbsp;");
+const termClearBody = () => {
+  const b = document.getElementById("term-body");
+  if (b) b.innerHTML = "";
+};
 
 function initTerminal() {
-  // Open buttons (desktop + mobile)
   document.getElementById("nav-terminal-btn")?.addEventListener("click", () => {
     playSound("navigasi", 0.5);
     openTerminal();
@@ -591,39 +601,66 @@ function initTerminal() {
       playSound("navigasi", 0.5);
       openTerminal();
     });
-
-  // Close
   document
     .getElementById("term-close")
     ?.addEventListener("click", closeTerminal);
   document.getElementById("term-ov")?.addEventListener("click", closeTerminal);
 
-  // Input handler
   const input = document.getElementById("term-input");
   if (!input) return;
 
   input.addEventListener("keydown", async (e) => {
+    // Arrow up/down: history recall
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (termMode || !termHistory.length) return;
+      termHistoryIdx = Math.min(termHistoryIdx + 1, termHistory.length - 1);
+      input.value = termHistory[termHistory.length - 1 - termHistoryIdx];
+      setTimeout(() => {
+        input.selectionStart = input.selectionEnd = input.value.length;
+      }, 0);
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (termMode) return;
+      if (termHistoryIdx <= 0) {
+        termHistoryIdx = -1;
+        input.value = "";
+        return;
+      }
+      termHistoryIdx--;
+      input.value = termHistory[termHistory.length - 1 - termHistoryIdx];
+      return;
+    }
+    if (e.key === "Tab") {
+      e.preventDefault();
+      return;
+    }
     if (e.key !== "Enter") return;
+
     e.preventDefault();
     const raw = input.value;
     input.value = "";
+    termHistoryIdx = -1;
 
-    // Mask password display
-    const displayVal =
-      termInputMode === "password" ? "●".repeat(raw.length) : raw;
-    termPrint(
-      `<span class="term-cmd">${document.getElementById("term-prompt")?.textContent || "$"} ${displayVal}</span>`,
-    );
+    // Save to history (never save password)
+    if (raw.trim() && termMode !== "password" && termMode !== "username") {
+      if (termHistory[termHistory.length - 1] !== raw.trim()) {
+        termHistory.push(raw.trim());
+        if (termHistory.length > 50) termHistory.shift();
+      }
+    }
+
+    // Echo line (mask password chars)
+    const display = termMode === "password" ? "●".repeat(raw.length) : raw;
+    const prompt = document.getElementById("term-prompt")?.textContent || "$";
+    termPrint(`<span class="term-cmd">${prompt} ${display}</span>`);
 
     await handleTermInput(raw.trim());
   });
 
-  // Block Tab (prevent focus escape)
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Tab") e.preventDefault();
-  });
-
-  // Escape closes
+  // ESC closes terminal
   document.addEventListener("keydown", (e) => {
     if (
       e.key === "Escape" &&
@@ -637,387 +674,213 @@ function initTerminal() {
 async function handleTermInput(cmd) {
   const lower = cmd.toLowerCase();
 
-  /* ── Multi-step input modes ── */
-  if (termInputMode === "username") {
+  /* ── Auth flow ── */
+  if (termMode === "username") {
     termTempUser = cmd;
-    termInputMode = "password";
-    const prompt = document.getElementById("term-prompt");
-    if (prompt) prompt.textContent = "password:";
+    termMode = "password";
+    document.getElementById("term-prompt").textContent = "password:";
     termPrint("Enter password:", "term-sys");
     return;
   }
 
-  if (termInputMode === "password") {
-    const uHash = await sha256(termTempUser);
-    const pHash = await sha256(cmd);
-    termInputMode = null;
+  if (termMode === "password") {
+    const [uHash, pHash] = await Promise.all([
+      sha256(termTempUser),
+      sha256(cmd),
+    ]);
+    const pr = document.getElementById("term-prompt");
+    termMode = null;
     termTempUser = "";
-    const prompt = document.getElementById("term-prompt");
-    if (prompt) prompt.textContent = "guest@yorha:~$";
+
     if (uHash === CRED_HASH.user && pHash === CRED_HASH.pass) {
       termAuth = true;
-      if (prompt) prompt.textContent = "operator@yorha:~#";
+      if (pr) pr.textContent = "operator@yorha:~#";
       playSound("confirm", 0.7);
       termBlank();
       termPrint("Authentication successful. Welcome, Operator.", "term-ok");
-      termPrint("Clearance level: ADMINISTRATOR", "term-priv");
       termPrint(
-        "Type <span class='term-hl'>help</span> for available commands.",
+        "Clearance: <span class='term-hl'>ADMINISTRATOR</span>",
+        "term-sys",
+      );
+      termPrint(
+        "Type <span class='term-hl'>help</span> for commands.",
         "term-sys",
       );
       termBlank();
     } else {
+      if (pr) pr.textContent = "guest@yorha:~$";
       playSound("select", 0.4);
       termPrint("Authentication failed. Access denied.", "term-err");
-      termPrint(
-        "Credentials are not stored. Try again with <span class='term-hl'>login</span>.",
-        "term-sys",
-      );
+      termPrint("Try <span class='term-hl'>login</span> again.", "term-sys");
       termBlank();
     }
     return;
   }
 
-  /* ── Project add multi-step ── */
-  if (termInputMode === "proj-add") {
-    const fields = ["title", "desc", "tags", "lv", "status"];
-    const prompts = [
-      "Project title:",
-      "Description:",
-      "Tags (comma-separated):",
-      "Level (1-99):",
-      "Status (COMPLETE/IN PROGRESS/ARCHIVED):",
-    ];
-    termProjDraft._fields = fields;
-    termProjDraft._step = termProjDraft._step || 0;
-
-    const field = fields[termProjDraft._step];
-    if (field === "tags") {
-      termProjDraft[field] = cmd
-        .split(",")
-        .map((t) => t.trim().toUpperCase())
-        .filter(Boolean);
-    } else if (field === "lv") {
-      termProjDraft[field] = Math.min(99, Math.max(1, parseInt(cmd) || 50));
-    } else if (field === "status") {
-      const valid = ["COMPLETE", "IN PROGRESS", "ARCHIVED"];
-      termProjDraft[field] = valid.includes(cmd.toUpperCase())
-        ? cmd.toUpperCase()
-        : "IN PROGRESS";
-    } else {
-      termProjDraft[field] = cmd;
-    }
-    termProjDraft._step++;
-
-    if (termProjDraft._step < fields.length) {
-      termPrint(prompts[termProjDraft._step], "term-priv");
-    } else {
-      // Save
-      const newKey = "proj-" + Date.now();
-      projectData[newKey] = {
-        title: termProjDraft.title,
-        desc: termProjDraft.desc,
-        tags: termProjDraft.tags,
-        lv: termProjDraft.lv,
-        status: termProjDraft.status,
-        count: "1 / 99",
-      };
-      termInputMode = null;
-      termProjDraft = {};
-      refreshProjectList();
-      playSound("confirm", 0.7);
-      termPrint("Project added successfully.", "term-ok");
-      termPrint(
-        `ID: <span class='term-hl'>${newKey}</span> — Switch to PROJECTS tab to view.`,
-        "term-sys",
-      );
-      termBlank();
-    }
-    return;
-  }
-
-  /* ── Project edit multi-step ── */
-  if (termInputMode === "proj-edit") {
-    if (termProjDraft._step === 0) {
-      // Expecting field name
-      const validFields = ["title", "desc", "tags", "lv", "status"];
-      if (!validFields.includes(cmd.toLowerCase())) {
-        termPrint(
-          `Unknown field. Valid: ${validFields.join(", ")}`,
-          "term-err",
-        );
-        termPrint("Field to edit:", "term-priv");
-        return;
-      }
-      termProjDraft._editField = cmd.toLowerCase();
-      termProjDraft._step = 1;
-      termPrint(
-        `New value for <span class='term-hl'>${termProjDraft._editField}</span>:`,
-        "term-priv",
-      );
-      return;
-    }
-    if (termProjDraft._step === 1) {
-      const field = termProjDraft._editField;
-      const proj = projectData[termEditKey];
-      if (!proj) {
-        termInputMode = null;
-        termPrint("Project not found.", "term-err");
-        return;
-      }
-      if (field === "tags") {
-        proj[field] = cmd
-          .split(",")
-          .map((t) => t.trim().toUpperCase())
-          .filter(Boolean);
-      } else if (field === "lv") {
-        proj[field] = Math.min(99, Math.max(1, parseInt(cmd) || proj.lv));
-      } else {
-        proj[field] = cmd;
-      }
-      termInputMode = null;
-      termEditKey = "";
-      termProjDraft = {};
-      refreshProjectList();
-      playSound("confirm", 0.7);
-      termPrint("Project updated successfully.", "term-ok");
-      termBlank();
-      return;
-    }
-  }
-
-  /* ── Standard commands ── */
   if (!cmd) return;
 
-  switch (lower) {
-    case "help":
+  /* ── Commands ── */
+  if (lower === "help") {
+    termBlank();
+    termPrint("─── COMMANDS ───────────────────────────────", "term-priv");
+    termPrint(
+      "  <span class='term-hl'>help</span>            Show this list",
+      "term-sys",
+    );
+    termPrint(
+      "  <span class='term-hl'>clear</span>           Clear terminal output",
+      "term-sys",
+    );
+    termPrint(
+      "  <span class='term-hl'>cls</span>             Close terminal window",
+      "term-sys",
+    );
+    termPrint(
+      "  <span class='term-hl'>whoami</span>          Current user",
+      "term-sys",
+    );
+    termPrint(
+      "  <span class='term-hl'>status</span>          System status",
+      "term-sys",
+    );
+    termPrint(
+      "  <span class='term-hl'>ls projects</span>     List all projects",
+      "term-sys",
+    );
+    termPrint(
+      "  <span class='term-hl'>ls logs</span>         List field log entries",
+      "term-sys",
+    );
+    termPrint("  <span class='term-hl'>yorha</span>           ???", "term-sys");
+    termPrint(
+      "  <span class='term-hl'>login</span>           Authenticate",
+      "term-sys",
+    );
+    termPrint(
+      "  <span class='term-hl'>logout</span>          End session",
+      "term-sys",
+    );
+    termBlank();
+    termPrint("─── TIPS ───────────────────────────────────", "term-priv");
+    termPrint("  ↑ ↓  Recall command history", "term-sys");
+    termPrint("  ESC  Close terminal", "term-sys");
+    termBlank();
+  } else if (lower === "clear") {
+    termClearBody();
+  } else if (lower === "cls") {
+    // cls = close terminal (like closing a terminal window, not clearing output)
+    closeTerminal();
+  } else if (lower === "whoami") {
+    termPrint(
+      termAuth ? "operator — authenticated" : "guest — unauthenticated",
+      termAuth ? "term-ok" : "term-sys",
+    );
+    termBlank();
+  } else if (lower === "status") {
+    termPrint(`System:   <span class='term-ok'>ONLINE</span>`, "term-sys");
+    termPrint(
+      `Auth:     ${termAuth ? "<span class='term-ok'>AUTHENTICATED</span>" : "<span class='term-warn'>GUEST</span>"}`,
+      "term-sys",
+    );
+    termPrint(`Projects: ${PROJECTS.length}`, "term-sys");
+    termPrint(`Logs:     ${FIELD_LOG.length}`, "term-sys");
+    termPrint(`Time:     ${new Date().toLocaleString("id-ID")}`, "term-sys");
+    termBlank();
+  } else if (lower === "ls projects") {
+    termBlank();
+    termPrint("Projects:", "term-priv");
+    PROJECTS.forEach((p, i) =>
+      termPrint(`  [${i}] ${p.title} — Lv:${p.lv} [${p.status}]`, "term-sys"),
+    );
+    termBlank();
+  } else if (lower === "ls logs") {
+    termBlank();
+    termPrint("Field Log:", "term-priv");
+    FIELD_LOG.forEach((l, i) =>
+      termPrint(`  [${i}] ${l.title} — ${l.date}`, "term-sys"),
+    );
+    termBlank();
+  } else if (lower === "yorha") {
+    triggerGlitch();
+    setTimeout(triggerGlitch, 130);
+    playSound("notif", 0.7);
+    termBlank();
+    termPrint("// GLORY TO MANKIND //", "term-priv");
+    termPrint("// Emotions are prohibited. //", "term-priv");
+    termBlank();
+    openAlert(
+      "GLORY TO MANKIND",
+      "// Easter Egg Unlocked, Commander. //<br/>Emotions are prohibited.",
+      true,
+    );
+  } else if (lower === "login") {
+    if (termAuth) {
+      termPrint("Already authenticated.", "term-ok");
       termBlank();
-      termPrint("Available commands:", "term-priv");
-      termPrint(
-        "  <span class='term-hl'>help</span>          — Show this list",
-        "term-sys",
-      );
-      termPrint(
-        "  <span class='term-hl'>clear</span>         — Clear terminal",
-        "term-sys",
-      );
-      termPrint(
-        "  <span class='term-hl'>whoami</span>        — Current user info",
-        "term-sys",
-      );
-      termPrint(
-        "  <span class='term-hl'>status</span>        — System status",
-        "term-sys",
-      );
-      termPrint(
-        "  <span class='term-hl'>ls projects</span>   — List all projects",
-        "term-sys",
-      );
-      termPrint(
-        "  <span class='term-hl'>yorha</span>         — ???",
-        "term-sys",
-      );
+      return;
+    }
+    termMode = "username";
+    document.getElementById("term-prompt").textContent = "username:";
+    termPrint("Enter username:", "term-sys");
+  } else if (lower === "logout") {
+    if (!termAuth) {
+      termPrint("Not authenticated.", "term-warn");
       termBlank();
-      termPrint(
-        "Authenticated commands (requires <span class='term-hl'>login</span>):",
-        "term-priv",
-      );
-      termPrint(
-        "  <span class='term-hl'>login</span>         — Authenticate as operator",
-        "term-sys",
-      );
-      termPrint(
-        "  <span class='term-hl'>logout</span>        — End session",
-        "term-sys",
-      );
-      termPrint(
-        "  <span class='term-hl'>proj add</span>      — Add new project",
-        "term-sys",
-      );
-      termPrint(
-        "  <span class='term-hl'>proj edit [id]</span>— Edit project by ID",
-        "term-sys",
-      );
-      termPrint(
-        "  <span class='term-hl'>proj delete [id]</span>— Delete project by ID",
-        "term-sys",
-      );
-      termPrint(
-        "  <span class='term-hl'>proj list</span>     — List with IDs",
-        "term-sys",
-      );
-      termBlank();
-      break;
-
-    case "clear":
-      termClear();
-      break;
-
-    case "whoami":
-      termPrint(
-        termAuth
-          ? "operator — authenticated session"
-          : "guest — unauthenticated",
-        termAuth ? "term-ok" : "term-sys",
-      );
-      termBlank();
-      break;
-
-    case "status":
-      termPrint("System: <span class='term-ok'>ONLINE</span>", "term-sys");
-      termPrint(
-        "Auth:   " +
-          (termAuth
-            ? "<span class='term-ok'>AUTHENTICATED</span>"
-            : "<span class='term-warn'>GUEST</span>"),
-        "term-sys",
-      );
-      termPrint("Projects: " + Object.keys(projectData).length, "term-sys");
-      termPrint("Time: " + new Date().toLocaleString("id-ID"), "term-sys");
-      termBlank();
-      break;
-
-    case "ls projects":
-      termBlank();
-      termPrint("Projects:", "term-priv");
-      Object.entries(projectData).forEach(([k, d]) => {
-        termPrint(`  [${k}] ${d.title} — Lv:${d.lv} ${d.status}`, "term-sys");
-      });
-      termBlank();
-      break;
-
-    case "yorha":
-      triggerGlitch();
-      setTimeout(triggerGlitch, 130);
-      playSound("notif", 0.7);
-      termBlank();
-      termPrint("// GLORY TO MANKIND //", "term-priv");
-      termPrint("// Emotions are prohibited. //", "term-priv");
-      termBlank();
-      openAlert(
-        "GLORY TO MANKIND",
-        "// Easter Egg Unlocked, Commander. //<br/>Emotions are prohibited.",
-        true,
-      );
-      break;
-
-    case "login":
-      if (termAuth) {
-        termPrint("Already authenticated.", "term-ok");
-        termBlank();
-        break;
-      }
-      termInputMode = "username";
-      const prompt = document.getElementById("term-prompt");
-      if (prompt) prompt.textContent = "username:";
-      termPrint("Enter username:", "term-sys");
-      break;
-
-    case "logout":
-      if (!termAuth) {
-        termPrint("Not authenticated.", "term-warn");
-        termBlank();
-        break;
-      }
-      termAuth = false;
-      const pr = document.getElementById("term-prompt");
-      if (pr) pr.textContent = "guest@yorha:~$";
-      playSound("select", 0.5);
-      termPrint("Session terminated.", "term-sys");
-      termBlank();
-      break;
-
-    default:
-      /* Authenticated multi-word commands */
-      if (!termAuth) {
-        termPrint(
-          `Command not found: ${cmd}. Type <span class='term-hl'>help</span> for list.`,
-          "term-err",
-        );
-        termBlank();
-        break;
-      }
-
-      if (lower === "proj add") {
-        termInputMode = "proj-add";
-        termProjDraft = { _step: 0 };
-        termBlank();
-        termPrint(
-          "Adding new project. Fill in the following fields:",
-          "term-priv",
-        );
-        termPrint("Project title:", "term-priv");
-        break;
-      }
-
-      if (lower === "proj list") {
-        termBlank();
-        termPrint("ID → Title [Status]", "term-priv");
-        Object.entries(projectData).forEach(([k, d]) => {
-          termPrint(
-            `  <span class='term-hl'>${k}</span> → ${d.title} [${d.status}] Lv:${d.lv}`,
-            "term-sys",
-          );
-        });
-        termBlank();
-        break;
-      }
-
-      if (lower.startsWith("proj edit ")) {
-        const key = lower.replace("proj edit ", "").trim();
-        if (!projectData[key]) {
-          termPrint(
-            `Project "${key}" not found. Use <span class='term-hl'>proj list</span> for IDs.`,
-            "term-err",
-          );
-          termBlank();
-          break;
-        }
-        termEditKey = key;
-        termInputMode = "proj-edit";
-        termProjDraft = { _step: 0 };
-        termBlank();
-        termPrint(
-          `Editing: <span class='term-hl'>${projectData[key].title}</span>`,
-          "term-priv",
-        );
-        termPrint("Field to edit (title/desc/tags/lv/status):", "term-priv");
-        break;
-      }
-
-      if (lower.startsWith("proj delete ")) {
-        const key = lower.replace("proj delete ", "").trim();
-        if (!projectData[key]) {
-          termPrint(`Project "${key}" not found.`, "term-err");
-          termBlank();
-          break;
-        }
-        const title = projectData[key].title;
-        delete projectData[key];
-        refreshProjectList();
-        playSound("confirm", 0.7);
-        termPrint(`Deleted: ${title}`, "term-ok");
-        termBlank();
-        break;
-      }
-
-      termPrint(
-        `Command not found: ${cmd}. Type <span class='term-hl'>help</span> for list.`,
-        "term-err",
-      );
-      termBlank();
+      return;
+    }
+    termAuth = false;
+    document.getElementById("term-prompt").textContent = "guest@yorha:~$";
+    playSound("select", 0.5);
+    termPrint("Session terminated.", "term-sys");
+    termBlank();
+  } else {
+    termPrint(
+      `Command not found: ${cmd}. Type <span class='term-hl'>help</span>.`,
+      "term-err",
+    );
+    termBlank();
   }
 }
 
 /* ════════════════════════════════════════════
-   EASTER EGG (keyboard — desktop)
-   Mobile uses terminal command 'yorha'
+   INIT SCREEN
+════════════════════════════════════════════ */
+function initInitScreen() {
+  const screen = document.getElementById("init-screen");
+  const appWrap = document.getElementById("app-wrap");
+  if (!screen) return;
+
+  let dismissed = false;
+
+  function dismiss() {
+    if (dismissed) return;
+    dismissed = true;
+    try {
+      playSound("opening", 0.6);
+    } catch (e) {}
+    screen.style.transition = "opacity 0.5s ease";
+    screen.style.opacity = "0";
+    if (appWrap) appWrap.style.visibility = "visible";
+    setTimeout(() => {
+      screen.style.display = "none";
+    }, 550);
+  }
+
+  document.getElementById("btn-init")?.addEventListener("click", dismiss);
+  screen.addEventListener("click", dismiss);
+  window.addEventListener("keydown", dismiss, { once: true });
+}
+
+/* ════════════════════════════════════════════
+   EASTER EGG — type "yorha" anywhere
 ════════════════════════════════════════════ */
 function initEasterEgg() {
   let buf = "";
   document.addEventListener("keydown", (e) => {
-    // Don't capture when terminal input is focused
     if (document.activeElement?.id === "term-input") return;
+    if (document.getElementById("term-modal")?.classList.contains("open"))
+      return;
+
     buf = (buf + e.key.toLowerCase()).slice(-10);
     if (buf.includes("yorha")) {
       buf = "";
@@ -1033,3 +896,22 @@ function initEasterEgg() {
     if (e.key === "g") triggerGlitch();
   });
 }
+
+/* ════════════════════════════════════════════
+   BOOT
+════════════════════════════════════════════ */
+document.addEventListener("DOMContentLoaded", () => {
+  initAudio();
+  initCursor();
+  initNav();
+  initGlitch();
+  initSkillBars();
+  buildProjectList(); // renders from PROJECTS in data.js
+  buildLogList(); // renders from FIELD_LOG in data.js
+  initClock();
+  initAlert();
+  initTerminal();
+  initKeyboardNav();
+  initEasterEgg();
+  initInitScreen();
+});
